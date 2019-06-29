@@ -26,6 +26,15 @@ RUN apt-get update && \
 # This allows non-root to install python libraries if required
 RUN mkdir -p ${VENV_DIR} && chown -R ${NB_USER} ${VENV_DIR}
 
+USER root
+COPY . ${HOME}
+## Enable this to copy files from the binder subdirectory
+## to the home, overriding any existing files.
+## Useful to create a setup on binder that is different from a
+## clone of your repository
+## COPY binder ${HOME}
+RUN chown -R ${NB_USER} ${HOME}
+
 USER ${NB_USER}
 RUN python3 -m venv ${VENV_DIR} && \
     # Explicitly install a new enough version of pip
