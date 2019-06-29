@@ -34,5 +34,8 @@ RUN export MANPATH=/home/jovyan/R/3.6.0/man:$MANPATH
 RUN export JAVA_HOME=/share/applications/java/java8
 RUN export PATH=/home/jovyan/R/3.6.0/bin:$JAVA_HOME/bin:$PATH
 
-
 RUN source ~/.bashrc
+
+RUN R -e "install.packages(c('PhyloProfile'), repos = 'http://cran.us.r-project.org')"
+
+
