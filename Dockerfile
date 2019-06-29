@@ -1,30 +1,49 @@
-FROM jupyter/datascience-notebook:8a1b90cbcba5
+FROM rocker/geospatial:3.6.0
 
-RUN pip install --no-cache-dir notebook==5.*
+ENV NB_USER rstudio
+ENV NB_UID 1000
+ENV VENV_DIR /srv/venv
 
-# Make sure the contents of our repo are in ${HOME}
-COPY . ${HOME}
-USER root
-RUN chown -R ${NB_UID} ${HOME}
+# Set ENV for all programs...
+ENV PATH ${VENV_DIR}/bin:$PATH
+# And set ENV for R! It doesn't read from the environment...
+RUN echo "PATH=${PATH}" >> /usr/local/lib/R/etc/Renviron
+
+# The `rsession` binary that is called by nbrsessionproxy to start R doesn't seem to start
+# without this being explicitly set
+ENV LD_LIBRARY_PATH /usr/local/lib/R/lib
+
+ENV HOME /home/${NB_USER}
+WORKDIR ${HOME}
+
+RUN apt-get update && \
+    apt-get -y install python3-venv python3-dev && \
+    apt-get purge && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create a venv dir owned by unprivileged user & set up notebook in it
+# This allows non-root to install python libraries if required
+RUN mkdir -p ${VENV_DIR} && chown -R ${NB_USER} ${VENV_DIR}
+
 USER ${NB_USER}
+RUN python3 -m venv ${VENV_DIR} && \
+    # Explicitly install a new enough version of pip
+    pip3 install pip==9.0.1 && \
+    pip3 install --no-cache-dir \
+         nbrsessionproxy==0.6.1 && \
+    jupyter serverextension enable --sys-prefix --py nbrsessionproxy && \
+    jupyter nbextension install    --sys-prefix --py nbrsessionproxy && \
+    jupyter nbextension enable     --sys-prefix --py nbrsessionproxy
 
-RUN mkdir ~/src # (optional, only when the folder not exists)
-RUN cd ~/src
-RUN wget https://ftp.gwdg.de/pub/misc/cran/src/base/R-3/R-3.6.0.tar.gz
-RUN tar xvfz R-3.6.0.tar.gz
-RUN cd R-3.6.0
-RUN ./configure --prefix=/home/jovyan/R/3.6.0 --enable-memory-profiling --enable-R-shlib --with-blas --with-cairo --with-lapack --with-x=yes
-RUN make -j4
-RUN make install
+
+RUN R --quiet -e "devtools::install_github('IRkernel/IRkernel')" && \
+    R --quiet -e "IRkernel::installspec(prefix='${VENV_DIR}')"
+
+RUN R --quiet -e "devtools::install_github('gedankenstuecke/PhyloProfile')"
+
+CMD jupyter notebook --ip 0.0.0.0
 
 
-RUN export LD_LIBRARY_PATH=/home/jovyan/R/3.6.0/lib:$LD_LIBRARY_PATH
-RUN export MANPATH=/home/jovyan/R/3.6.0/man:$MANPATH
-RUN export JAVA_HOME=/share/applications/java/java8
-RUN export PATH=/home/jovyan/R/3.6.0/bin:$JAVA_HOME/bin:$PATH
-
-RUN source ~/.bashrc
-
-RUN R -e "install.packages(c('PhyloProfile'), repos = 'http://cran.us.r-project.org')"
 
 
